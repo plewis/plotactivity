@@ -615,7 +615,7 @@ SOFTWARE.
                 else if (d3.event.keyCode === 82) {
                     // Scatterplot asks server for a list of fake clients to simulate lots of connnections
                     socket.emit("log debug", "scatterplot says R key was pressed: sending test register message");
-                    socket.emit("test register");
+                    socket.emit("fake register");
                 }
                 else if (d3.event.keyCode === 85) {
                     // Scatterplot asks server for a list of saved clients in clients-saved.

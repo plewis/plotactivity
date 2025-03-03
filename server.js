@@ -13,7 +13,7 @@
 
 const gnetum_https = false;
 
-// e.g. clients[netid] = {netid:pol02003, ipaddr:10.20.30.40, useragent:blahblahblah, fname:"Paul", x:0.122, y:.345, y0:0.679}
+// e.g. clients[netid] = {netid:pol02003, fname:"Paul", x:0.122, y:.345, y0:0.679}
 var netid_clients = {};
 
 // Number of times clients has been saved to clients-<++nsaves>.cjs
@@ -56,12 +56,12 @@ const { axisinfo, log_heartbeat_messages, fx, dfx } = require('./public/settings
 
 // Load fake client data
 // (brackets around Server is shorthand for "const test = require('./test.cjs').test"
-const { test } = require('./test.cjs');      // first name and netid only
+const { fakeclients } = require('./fakeclients.cjs');      // first name and netid only
 const { createFakeClient } = require('./fake-client.js'); 
 
 // Load real client data from past run
-// (brackets around Server is shorthand for "const savedclients = require('./savedclients.cjs').savedclients"
-const { savedclients } = require('./savedclients.cjs');  
+// (brackets around Server is shorthand for "const saveddata = require('./saveddata.cjs').saveddata"
+const { saveddata } = require('./saveddata.cjs');  
 
 // Set up logger
 // logger levels: ALL < TRACE < DEBUG < INFO < WARN < ERROR < FATAL < MARK < OFF 
@@ -351,8 +351,6 @@ function yvaluehandler(request, response) {
 // request is an IncomingMessage object (https://www.w3schools.com/nodejs/obj_http_incomingmessage.asp)
 // response is a ServerResponse object (https://www.w3schools.com/nodejs/obj_http_serverresponse.asp)
 function plothandler(request, response) {
-    //TODO: not sure how best to handle identifying the scatterplot client
-    //netid_clients["scatterplot"] = {netid:"scatterplot", ipaddr:"none", useragent:"none", fname:"Scatterplot", x:0.0, y:0.0, y0:0.0};
     request.session.netid = "scatterplot";
     var sid = request.sessionID;
     logger.debug('plothandler called with sid = ' + sid)
@@ -459,11 +457,11 @@ io.on('connection', function(socket) {
     });
     
     // Handle request by phylo for testing registration
-    socket.on('test register', () => {
-        logger.debug("server received test register message: creating fake clients for all entries in test.cjs");
-        let nfakeclients = test.length;
+    socket.on('fake register', () => {
+        logger.debug("server received test register message: creating fake clients for all entries in fakeclients.cjs");
+        let nfakeclients = 1; //fakeclients.length;
         for (let i = 0; i < nfakeclients; i++)
-            createFakeClient(test[i]);
+            createFakeClient(fakeclients[i], gnetum_https);
     });
             
     // Handle request by phylo to load saved clients
