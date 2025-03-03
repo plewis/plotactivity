@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Mean Fitness Plot</title>
+        <script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+        <script src="/socket.io/socket.io.js" type="text/javascript"></script>
+    	<link rel="icon" type="image/png" href="/favicon.ico" />
+    	<link rel="stylesheet" href="/main.css">
+        <script src="/settings.js" type="text/javascript"></script>
+    </head>
+    <body>
+        <div id="homepage">
+        
+            <div id="title">
+                <h1 class="labelfont">Frequency: p = __PVALUE__</h1>
+            </div>
+            
+            <div id="content">
+            
+                <form id="form" action="/yvalue" method="get">
+                
+                    <label id="yvalue_label" class="labelfont" for="yvalue">Your Calculated Mean Fitness</label>
+                    <input id="yvalue" class="labelfont" type="text" name="yvalue" value="" pattern="0*[.][0-9]+" oninvalid="alert('Enter a value in the format 0.123')" required=true autocomplete="off" autocorrect="off" autocapitalize="off" />
+
+                    <button id="submitbtn" type="submit" class="labelfont">Submit</button>
+                
+                </form>
+            
+            </div>
+            
+            <p id="messages" class="labelfont">Calculate the mean fitness based on the frequency you were given and enter it as a number between 0.000 and 0.999</p>
+
+        </div>
+        <script type="text/javascript">
+            document.getElementById("yvalue").focus();
+        </script>
+  </body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Mean Fitness Plot</title>
+        <script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+        <script src="/socket.io/socket.io.js" type="text/javascript"></script>
+    	<link rel="icon" type="image/png" href="/favicon.ico" />
+    	<link rel="stylesheet" href="/main.css">
+        <script src="/settings.js" type="text/javascript"></script>
+    </head>
+    <body>
+        <div id="homepage">
+        
+            <div id="title">
+                <h1 class="labelfont">Join the Mean Fitness Plotters</h1>
+            </div>
+            
+            <div id="content">
+            
+                <form id="form" action="/xtask" method="get">
+                
+                    <label id="fname_label" class="labelfont" for="fname">Your First Name</label>
+                    <input id="fname" class="labelfont" type="text" name="fname" value="__TESTFNAME__" autocomplete="off" autocorrect="off" autocapitalize="off" />
+
+                    <label id="netid_label" class="labelfont" for="netid">UConn NetID</label>
+                    <input id="netid" class="labelfont" type="text" name="netid" value="__TESTNETID__" pattern="[a-zA-z]{3}[0-9]{5}", autocomplete="off" autocorrect="off" autocapitalize="off" />
+                    
+                    <button id="submitbtn" class="labelfont" type="submit">Join Now</button>
+                
+                </form>
+            
+            </div>
+            
+            <p id="messages" class="labelfont"></p>
+
+        </div>
+        <script type="text/javascript">
+            document.getElementById("fname").focus();
+        </script>
+  </body>
+</html>

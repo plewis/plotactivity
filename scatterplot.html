@@ -1,0 +1,668 @@
+<!--
+The MIT License (MIT)
+
+Copyright (c) 2022-2025 Paul O. Lewis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the “Software”), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>Scatterplot Classroom Activity</title>
+    	<link rel="icon" type="image/png" href="/favicon.ico" />
+        <script src="https://d3js.org/d3.v4.min.js" charset="utf-8"></script>
+        <script src="/socket.io/socket.io.js" type="text/javascript"></script>
+    	<link rel="stylesheet" href="/main.css">
+        <script src="/settings.js" type="text/javascript"></script>
+	</head>
+	<body>
+        <!-- 
+        <div id="tooltip" class="hidden">
+            <p><span id="treeinfo">xxx</span></p>
+        </div>
+        -->
+        <div id="container"></div>
+
+        <script type="text/javascript">
+                    
+            // Replaced by server with settings object when delivering this file to browser
+            //{{ settings }};
+            
+            // https://socket.io/get-started/chat
+            // Load the socket.io-client, which exposes an io global
+            // Notice that no URL is specified in the call io(), since it 
+            // defaults to connecting to the host that serves the page
+            var socket = io({ query: { scatterplot:true } });
+
+            // Pseudorandom number generator
+            //let rnseed = Math.floor(10000*Math.random());
+            //console.log("rnseed = " + rnseed);
+            //let lot = new Random(rnseed);
+
+            // Width and height
+            var w = 800;
+            var h = 800;
+            
+            // X-axis is frequency of allele, so range is 0 to 1
+            var xmin = axisinfo.xaxismin;
+            var xmax = axisinfo.xaxismax;
+            
+            // Y-axis is mean fitness, which, for the sickle-cell example,
+            // ranges from 0.14 to 0.90, which we will round to 0.0 to 1.0
+            // p = 0.000: 0.000*0.000*0.14 + 2.0*0.000*1.000*1.00 + 1.000*1.000*.88 = 0.880
+            // p = 0.122: 0.122*0.122*0.14 + 2.0*0.122*0.879*1.00 + 0.879*0.879*.88 = 0.896
+            // p = 0.500: 0.500*0.500*0.14 + 2.0*0.500*0.500*1.00 + 0.500*0.500*.88 = 0.755
+            // p = 1.000: 1.000*1.000*0.14 + 2.0*1.000*0.000*1.00 + 0.000*0.000*.88 = 0.140
+            var ymin = axisinfo.yaxismin;
+            var ymax = axisinfo.yaxismax;
+            
+            var padding_left   = 90;
+            var padding_right  = 50;
+            var padding_top    = 50;
+            var padding_bottom = 90;
+            var xaxis_spacer   = 12;
+            var yaxis_spacer   = 20;
+            const nsegments    = 200;
+            
+            const brickred                = "#B82E2E";
+            const navyblue                = "#000099";
+            const line_color              = "orange";
+            const point_color             = navyblue;
+            const deriv_color             = "black";
+            const deriv_box_color    = "black";
+            const deriv_box_bg_color = "white";
+            
+            const deriv_box_padding = 10;  // deriv box is wider and higher thant text by this amount
+            const deriv_line_length = 2.0; // on scale of allele frequency
+            
+            var debug_font_size = "8pt";  // used to show debug information in SVG
+            var html_font_size = "16pt";  // HTML font sizes seem to be bit larger than SVG font sizes
+            var font_size = "14pt";       // SVG font size
+            var help_font_size = "10pt";  // SVG font size for help text
+            var node_radius = 5;
+            var enlarged_node_radius = 8;
+
+            // axes labels
+            let axis_label_height = 18;
+            let axis_label_height_pixels = axis_label_height + "px";
+            
+            var periodInMilliseconds = 1000; // one beat per second
+            var timeoutId = -1;
+
+            // Each element of points will eventually have all these attributes.
+            // * Asterisk denotes attributes that come in from client via web form
+            // + Plus denotes attributes set in setInfoTextProperties function
+            // All other attributes set in addPoint function
+            // * fname              first name of person who created node
+            // * netid              netid of person who created node
+            //   x                  x-coordinate
+            //   y                  y-coordinate
+            // + nodeinfo_width     width (in pixels) of node info as displayed
+            // + nodeinfo_height    height (in pixels) of node info as displayed
+            // + nodeinfo_descent   descent (in pixels) of node info as displayed
+            var vertices = [];
+            /*var vertices = [
+                {x:0.0,   y:0.8800}, // .0*.0*.14+2*.0*1.+1.*1.*.88
+                {x:0.1,   y:0.8942}, // .1*.1*.14+2*.1*.9+.9*.9*.88
+                {x:0.122, y:0.8947}, // .122*.122*.14+2*.122*.878+.878*.878*.88
+                {x:0.2,   y:0.8888}, // .2*.2*.14+2*.2*.8+.8*.8*.88
+                {x:0.3,   y:0.8638}, // .3*.3*.14+2*.3*.7+.7*.7*.88
+                {x:0.4,   y:0.8192}, // .4*.4*.14+2*.4*.6+.6*.6*.88
+                {x:0.5,   y:0.7550}, // .5*.5*.14+2*.5*.5+.5*.5*.88
+                {x:0.6,   y:0.6712}, // .6*.6*.14+2*.6*.4+.4*.4*.88
+                {x:0.7,   y:0.5678}, // .7*.7*.14+2*.7*.3+.3*.3*.88
+                {x:0.8,   y:0.4448}, // .8*.8*.14+2*.8*.2+.2*.2*.88
+                {x:0.9,   y:0.3022}, // .9*.9*.14+2*.9*.1+.1*.1*.88
+                {x:1.0,   y:0.1400}  // 1.*1.*.14+2*1.*.0+.0*.0*.88
+            ];*/
+            
+            // Latch onto container div already created above
+            var container_div = d3.select("div#container");
+
+            // Create color scale
+            var color_scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+            //var drag = d3.drag()
+            //    .on("start", function(d) {
+            //        console.log("drag starting...");
+            //        d3.event.sourceEvent.stopPropagation();
+            //        d3.select(this).classed("dragging", true);
+            //        handleDragStart(d3.event.x, d3.event.y);
+            //    })
+            //    .on("drag", function(d) {
+            //        handleDragMiddle(d3.event.x, d3.event.y, d3.event.dx, d3.event.dy);
+            //    })
+            //    .on("end", function(d) {
+            //        console.log("drag stopping...");
+            //        d3.select(this).classed("dragging", false);
+            //        handleDragEnd(d3.event.x, d3.event.y, d3.event.dx, d3.event.dy);
+            //    });
+            
+            var setInfoTextProperties = function(nd, x, y) {
+                // Get bounding box dimensions for element xxx
+                //
+                //           bb.x   Set y=0 before calling getBBox so that bb.y equals
+                //           |      fraction of bb.height above the baseline
+                //  bb.y ____|_________________ ___
+                //           |                |  |            Example:
+                //           |                |  |              bb.x      = 484.28125
+                //           |                |  bb.height      bb.y      = -14
+                // (x,y) --> |................|  |              bb.width  = 31.421875
+                //           |________________| _|_             bb.height = 17
+                //           |----bb.width----|                 (thus, descent = 3 = 17 - 14)
+                
+                // Set node's html to netid followed by (x,y): "abc12345: (0.122,0.896)"
+                nd.node_html = nd.netid + ": (" + x.toFixed(3) + "," + x.toFixed(3) + ")";
+
+                // Use dummy text element to set height, width, and descent
+                dummy_text.attr("y", 0).text(nd.node_html); 
+                let bb_node = dummy_text.node().getBBox();
+                nd.nodeinfo_width   = bb_node.width;
+                nd.nodeinfo_height  = bb_node.height;
+                nd.nodeinfo_descent = bb_node.height + bb_node.y;
+            }
+                
+            var getTextProperties = function(s) {
+                // Get bounding box dimensions for element xxx
+                //
+                //           bb.x   Set y=0 before calling getBBox so that bb.y equals
+                //           |      fraction of bb.height above the baseline
+                //  bb.y ____|_________________ ___
+                //           |                |  |            Example:
+                //           |                |  |              bb.x      = 484.28125
+                //           |                |  bb.height      bb.y      = -14
+                // (x,y) --> |................|  |              bb.width  = 31.421875
+                //           |________________| _|_             bb.height = 17
+                //           |----bb.width----|                 (thus, descent = 3 = 17 - 14)
+                
+                // Use dummy text element to set height, width, and descent
+                dummy_text.attr("y", 0).text(s); 
+                let bb = dummy_text.node().getBBox();
+                return {width:bb.width, height:bb.height, descent:bb.height + bb.y};
+            }
+                
+            // Create SVG element
+            var svg = container_div.append("svg")
+                .attr("width", w)
+                .attr("height", h)
+                .on('mousemove', function() {
+                    handleMouseMove(d3.event.pageX, d3.event.pageY);
+                });
+                
+            // Debugging: create lavender-filled rect around entire plot area
+            let bg = svg.append("rect")
+                .attr("width", w)
+                .attr("height", h)
+                .style("visibility", "visible")
+                .style("fill", "lavender");
+                
+            // Create a dummy text element used later to get bounding box dimensions
+            // for all text elements
+            var dummy_text = svg.append("text")
+                .attr("id", "dummy")
+                .attr("x", w/2)
+                .attr("y", 0)
+                .style("font-family", "Verdana")
+                .style("font-size", font_size)
+                .style("visibility", "hidden")
+                .text("xxx");
+                                                        
+            // Create a text element showing help text (i.e. keys that have meaning)
+            let help_text = svg.append("text")
+                .attr("id", "help")
+                .attr("x", w/2)
+                .attr("y", 0)
+                .style("font-family", "Verdana")
+                .style("font-size", help_font_size)
+                .style("text-anchor", "middle") // "start", "middle", or "end"
+                .style("visibility", "hidden")
+                .text("D = delete, S = save, P = plot, R = register, U = load, X = stop polling");
+                                                        
+            // Create a group for points
+            svg.append("g").attr("id", "vertices");
+                
+            // Create scale for X axis
+            var xscale = d3.scaleLinear()
+                .domain([xmin, xmax])
+                .range([padding_left, w - padding_right]);
+
+            // Create scale for Y axis
+            var yscale = d3.scaleLinear()
+                .domain([ymax, ymin])
+                .range([padding_top, h - padding_bottom]);
+                                
+            // Create scale for drawing line segments
+            var line_scale = d3.scaleBand()
+                .domain(d3.range(nsegments+1))
+                .range(xscale.domain());
+
+            // Create x axis
+            let xaxis = d3.axisBottom(xscale)
+                .ticks(axisinfo.xaxisticks)
+                .tickFormat(d3.format(axisinfo.xaxisfmt));
+
+			// Add x axis to svg
+			svg.append("g")
+				.attr("id", "xaxis")
+				.attr("class", "axis")
+				.attr("transform", "translate(0," + (h - padding_bottom) + ")")
+				.call(xaxis);
+
+            // Create y axis
+            let yaxis = d3.axisLeft(yscale)
+                .ticks(axisinfo.yaxisticks)
+                .tickFormat(d3.format(axisinfo.yaxisfmt));
+
+			// Add y axis to svg
+			svg.append("g")
+				.attr("id", "yaxis")
+				.attr("class", "axis")
+				.attr("transform", "translate(" + padding_left + ",0)")
+				.call(yaxis);
+				
+			// Create x axis label
+			const x_axis_label = axisinfo.xaxislabel;
+			const xwhd = getTextProperties(x_axis_label);
+			let xlab = svg.append("text")
+			    .attr("id", "xlab")
+			    .attr("x", padding_left + (w - padding_left - padding_right)/2)
+			    .attr("y", h - xwhd.height - xaxis_spacer)
+                .style("font-family", "Helvetica")
+                .style("font-size", font_size)
+                .style("text-anchor", "middle") // "start", "middle", or "end"
+			    .text(x_axis_label);			    
+
+			// Create y axis label
+			// Note: when using transform attribute, keep in mind:
+			// 1. transform as used here is an SVG transform, not a CSS transform!
+			// 2. translate first, then rotate, otherwise the translation will be
+			//    done on rotated axes, which will probably place your label off
+			//    the viewing area entirely
+			const y_axis_label = axisinfo.yaxislabel;
+			const ywhd = getTextProperties(y_axis_label);
+			let ylab = svg.append("text")
+			    .attr("id", "ylab")
+			    .attr("x", 0)
+			    .attr("y", 0)
+                .attr("text-anchor", "middle") // "start", "middle", or "end"
+                .attr("transform", "translate(" + yaxis_spacer + "," + (padding_top + (h - padding_top - padding_bottom)/2) + ") rotate(-90)")
+                .style("font-family", "Helvetica")
+                .style("font-size", font_size)
+			    .text(y_axis_label);	
+			    			    
+            // Style the x- and y-axis
+            svg.selectAll('.axis line, .axis path')
+                .style('stroke', 'black')
+                .style('fill', 'none')
+                .style('stroke-width', '1px')
+                .style('shape-rendering', 'crispEdges');
+            svg.selectAll('g#xaxis g.tick text')
+                .classed('noselect', true)
+                .style('font-family', 'Helvetica')
+                .style('font-size', axis_label_height_pixels);
+            svg.selectAll('g#yaxis g.tick text')
+                .classed('noselect', true)
+                .style('font-family', 'Helvetica')
+                .style('font-size', axis_label_height_pixels);
+                                
+            // Function that recalculates the line segments making up the curve
+            let function_data = [];
+            function recalcLineData() {
+                function_data = [];
+                for (var i = 0; i <= nsegments; i++) {
+                    // calculate function for allele frequency corresponding to this segment
+                    let p = line_scale(i);
+                    let f = fx(p);
+                    function_data.push({'x':p, 'y':f});
+                }
+            }
+            recalcLineData();
+
+            // Create path representing curve
+            var lineFunc = d3.line()
+                .x(function(d) {return xscale(d.x);})
+                .y(function(d) {return yscale(d.y);});
+
+            let curve = svg.append("path")
+                .attr("id", "funcplot")
+                .attr("d", lineFunc(function_data))
+                .attr("fill", "none")
+                .attr("stroke", line_color)
+                .attr("stroke-width", 2)
+                .style("visibility", "hidden")
+                .style("pointer-events", "none");   // don't want line intercepting drag events
+                    
+            let deriv = svg.append("line")
+                .attr("id", "funcderiv")
+                .attr("x1", xscale(0.05))
+                .attr("y1", yscale(fx(0.1)))
+                .attr("x2", xscale(0.15))
+                .attr("y2", yscale(fx(0.1)))
+                .attr("fill", "none")
+                .attr("stroke", deriv_color)
+                .attr("stroke-width", 2)
+                .style("visibility", "hidden")
+                .style("pointer-events", "none");   // don't want line intercepting drag events                
+                
+            let deriv_box = svg.append("rect")
+                .attr("id", "derivbox")
+                .attr("x", xscale(0.1))
+                .attr("y", yscale(fx(0.1)))
+                .attr("width", 0)
+                .attr("height", 0)
+                .attr("stroke", deriv_box_color)
+                .attr("fill", deriv_box_bg_color)
+                .style("visibility", "hidden");
+                
+            let deriv_text = svg.append("text")
+                .attr("id", "derivtext")
+                .attr("x", xscale(0.1))
+                .attr("y", yscale(fx(0.1)))
+                .style("font-family", "Verdana")
+                .style("font-size", font_size)
+                .attr("fill", deriv_color)
+                .attr("stroke", deriv_color)
+                .style("visibility", "hidden")
+                .text("0.1");
+
+            //svg.select("g#vertices").selectAll("circle.node")
+            //    .data(vertices)
+            //    .enter()
+            //    .append('circle')
+            //    .attr("id", function(d) {return d.netid;})
+            //    .attr("class", "node")
+            //    .attr("cx", function(d) {return xscale(d.x);})
+            //    .attr("cy", function(d) {return yscale(d.y);})
+            //    .attr("r", node_radius)
+            //    .style("fill", "black")
+            //    .style("stroke", "black")
+            //    .on("mouseover", function(d) {
+            //        d3.select("foreignObject#" + "node-" + d.netid)
+            //            .style("visibility", "visible");
+            //        d3.select("circle#" + d.netid)
+            //            .attr("r", enlarged_node_radius);
+            //        //d3.select("circle#" + d.netid)
+            //        //    .style("fill", "red");
+            //        })
+            //    .on("mouseout", function(d) {
+            //        d3.select("foreignObject#" + "node-" + d.netid)
+            //            .style("visibility", "hidden");
+            //        d3.select("circle#" + d.netid)
+            //            .attr("r", node_radius);
+            //        });
+                
+            function addPoints(points) {
+                if (log_heartbeat_messages) {
+                    socket.emit("log debug", "scatterplot entering addPoints with " + vertices.length + " vertices");
+                }
+
+                // Each call to addPoint handles just one node from waiting_room
+                // If this is the first time refeshNodes has been called, then
+                // vertices will have just one element and that is the root node
+                vertices = [...points];
+                
+                //console.log(vertices);
+                                                    
+                svg.select("g#vertices").selectAll("circle.node").remove();
+                svg.select("g#vertices").selectAll("circle.node")
+                    .data(vertices)
+                    .enter()
+                    .append('circle')
+                    .attr("id", function(d) {return d.netid;})
+                    .attr("class", "node")
+                    .attr("cx", function(d) {return xscale(d.x);})
+                    .attr("cy", function(d) {return yscale(d.y);})
+                    .attr("r", node_radius)
+                    .style("fill", point_color)
+                    .style("stroke", point_color);
+                    //.on("mouseover", function(d) {
+                    //    d3.select("foreignObject#" + "node-" + d.netid)
+                    //        .style("visibility", "visible");
+                    //    d3.select("circle#" + d.netid)
+                    //        .attr("r", enlarged_node_radius);
+                    //    //d3.select("circle#" + d.netid)
+                    //    //    .style("fill", "red");
+                    //    })
+                    //.on("mouseout", function(d) {
+                    //    d3.select("foreignObject#" + "node-" + d.netid)
+                    //        .style("visibility", "hidden");
+                    //    d3.select("circle#" + d.netid)
+                    //        .attr("r", node_radius);
+                    //    });
+
+                // refresh x,y coordinates of all nodes and edges
+                //svg.selectAll("text.debuginfo")
+                //    .attr("x", function(d) {return xscale(d.x);})
+                //    .attr("y", function(d) {return yscale(d.y) - 10;})
+                //    .style("visibility", "hidden");
+                    
+                svg.select("g#vertices").selectAll("circle.node")
+                    .attr("cx", function(d) {return xscale(d.x);})
+                    .attr("cy", function(d) {return yscale(d.y);});
+                    //.style("fill", function(d) {return d.nchildren == 0 ? "magenta" : "black";});
+                    
+            } //addPoint
+                        
+            // Create drag behavior
+            var handleMouseMove = function(x, y) {
+                if (curve.style("visibility") === "visible") {
+                    let xvalue = xscale.invert(x);
+                    if (xvalue >= 0.0 && xvalue <= 1.0) {
+                        let yvalue = fx(xvalue);
+                        y = yscale(yvalue)
+                        let slope = dfx(xvalue);
+                        let zero_slope = false;
+                        if (Math.abs(slope) < .01) {
+                            zero_slope = true;
+                        }
+                        let theta = Math.atan(slope);
+                        let half = 0.5*deriv_line_length;
+
+                        let x1 = xvalue - half*Math.cos(theta);
+                        let y1 = yvalue - half*Math.sin(theta);
+                        let x2 = xvalue + half*Math.cos(theta);
+                        let y2 = yvalue + half*Math.sin(theta);
+                        if (x1 < 0.0) {
+                            // Crop derivative line at left end of x axis
+                            x1 = 0.0;
+                            y1 = yvalue - xvalue*Math.tan(theta);
+                        }
+                        if (x2 > 1.0) {
+                            // Crop derivative line at right end of x axis
+                            x2 = 1.0;
+                            y2 = yvalue + (1.0 - xvalue)*Math.tan(theta);
+                        }
+
+                        let x0pixels = xscale(xvalue)
+                        let y0pixels = yscale(yvalue)                        
+                        
+                        let x1pixels = xscale(x1);
+                        let y1pixels = yscale(y1);
+                        let x2pixels = xscale(x2);
+                        let y2pixels = yscale(y2);
+                        console.log("(" + x1pixels.toFixed(3) + "," + y1pixels.toFixed(3) + ") --> (" + x2pixels.toFixed(3) + "," + y2pixels.toFixed(3) + ")");
+                        let s = "x=" + xvalue.toFixed(3) + "\ny=" + yvalue.toFixed(3);
+                        let info = getTextProperties(s);
+                        let box_width = info.width;
+                        let box_height = info.height;
+                        let box_x = x0pixels - box_width/2 - deriv_box_padding;
+                        let box_y = y0pixels - box_height + info.descent - deriv_box_padding;
+                        if (box_x < padding_left) {
+                            // Keep deriv_box from moving off left end of x axis
+                            let left_overhang = padding_left - box_x;
+                            x0pixels += left_overhang;
+                            box_x = x0pixels - box_width/2 - deriv_box_padding;
+                        }
+                        else if (box_x + box_width > w - padding_right) {
+                            // Keep deriv_box from moving off right end of x axis
+                            let right_overhang = (box_x + box_width) - (w - padding_right);
+                            x0pixels -= right_overhang;
+                            box_x = x0pixels - box_width/2 - deriv_box_padding;
+                        }
+                        deriv_box.style("visibility", "visible")
+                            .attr("x", box_x)
+                            .attr("y", box_y)
+                            .attr("width", box_width + 2*deriv_box_padding)
+                            .attr("height", box_height + 2*deriv_box_padding);
+                        deriv_text.style("visibility", "visible")
+                            .attr("x", x0pixels)
+                            .attr("y", y0pixels)
+                            .style("text-anchor", "middle")
+                            .text(s);
+                        deriv.style("visibility", "visible")
+                            .attr("x1", x1pixels)
+                            .attr("y1", y1pixels)
+                            .attr("x2", x2pixels)
+                            .attr("y2", y2pixels)
+                            .attr("stroke-width", zero_slope ? 5 : 2)
+                            .attr("stroke", brickred);
+                    }
+                }
+            }            
+
+            //var handleDragStart = function(x,y) {
+            //    handleDrag(x, y);
+            //}
+//
+            //var handleDragMiddle = function(x,y,dx,dy) {
+            //    handleDrag(x, y);
+            //}
+//
+            //var handleDragEnd = function(x,y,dx,dy) {
+            //    deriv.style("visibility", "hidden");
+            //}
+
+            // Listen and react to keystrokes
+            function keyDown() {
+                // 65 is the "a" key
+                // 66 is the "b" key
+                // 67 is the "c" key
+                // 68 is the "d" key
+                // 69 is the "e" key
+                // 70 is the "f" key
+                // 71 is the "g" key
+                // 72 is the "h" key
+                // 73 is the "i" key
+                // 74 is the "j" key
+                // 75 is the "k" key
+                // 76 is the "l" key
+                // 77 is the "m" key
+                // 78 is the "n" key
+                // 79 is the "o" key
+                // 80 is the "p" key
+                // 81 is the "q" key
+                // 82 is the "r" key
+                // 83 is the "s" key
+                // 84 is the "t" key
+                // 85 is the "u" key
+                // 86 is the "v" key
+                // 87 is the "w" key
+                // 88 is the "x" key
+                // 89 is the "y" key
+                // 90 is the "z" key
+                // 38 is the "uparrow" key
+                // 40 is the "downarrow" key
+                // 37 is the "leftarrow" key
+                // 38 is the "uparrow" key
+                // 39 is the "rightarrow" key
+                if (d3.event.keyCode === 68) {
+                    // Scatterplot will ask server to save all clients and then delete all current points
+                    socket.emit("log debug", "scatterplot says D key was pressed: saving then deleting all points");
+                    socket.emit("save data");
+                    socket.emit("clear points");
+                    clients = [];
+                }
+                else if (d3.event.keyCode === 72) {
+                    // Toggles help text
+                    socket.emit("log debug", "scatterplot says H key was pressed: toggling help text");
+                    if (help_text.style("visibility") === "hidden") {
+            			const hprop = getTextProperties(help_text);
+            			const h = hprop.height + hprop.descent;
+                        help_text.attr("y", h.toFixed(1)).style("visibility", "visible");
+                    }
+                    else
+                        help_text.style("visibility", "hidden");
+                }
+                else if (d3.event.keyCode === 80) {
+                    // Scatterplot asks server for a list of fake clients to simulate lots of connnections
+                    socket.emit("log debug", "scatterplot says P key was pressed: toggling line plot display");
+                    if (curve.style("visibility") === "hidden") {
+                        curve.style("visibility", "visible");
+                    }
+                    else
+                        curve.style("visibility", "hidden");
+                        deriv.style("visibility", "hidden");
+                        deriv_box.style("visibility", "hidden");
+                        deriv_text.style("visibility", "hidden");
+                }
+                else if (d3.event.keyCode === 82) {
+                    // Scatterplot asks server for a list of fake clients to simulate lots of connnections
+                    socket.emit("log debug", "scatterplot says R key was pressed: sending test register message");
+                    socket.emit("test register");
+                }
+                else if (d3.event.keyCode === 85) {
+                    // Scatterplot asks server for a list of saved clients in clients-saved.
+                    socket.emit("log debug", "scatterplot says U key was pressed: sending use saved clients message");
+                    socket.emit("load saved clients");
+                }
+                else if (d3.event.keyCode === 88) {
+                    // Stops heartbeat, which means scatterplot will no longer ask server for points to plot
+                    socket.emit("log debug", "scatterplot says X key was pressed: stopping heartbeat");
+                    clearTimeout(timeoutId);
+                    timeoutID = -1;
+                }
+                else if (d3.event.keyCode === 83) {
+                    // Scatterplot will ask server to save all clients
+                    socket.emit("log debug", "scatterplot says S key was pressed: sending save points");
+                    socket.emit("save data");
+                }
+                else {
+                    socket.emit("log info", "scatterplot says key was pressed: " + d3.event.keyCode);
+                }
+            }                
+            d3.select("body").on("keydown", keyDown);
+            
+            socket.on("connect", () => {
+                socket.emit("log info", "scatterplot received connect message");
+                        
+                // Every periodInMilliseconds milliseconds, a heartbeat message will be 
+                // sent and is the signal used by scatterplot to poke the server
+                // to sent more points to plot
+                var heartbeat = function() {
+                    socket.emit('send points');
+                    timeoutId = setTimeout(heartbeat, periodInMilliseconds);
+                };
+            
+                // Ask server for points periodically to update plot
+                timeoutId = setTimeout(heartbeat, periodInMilliseconds);
+            });
+            
+            socket.on("points", (data) => {
+                if (log_heartbeat_messages) {
+                    socket.emit("log info", "scatterplot received points message from server");
+                }
+                // data is an array of point objects, each like this: {x:0.234, y:0.765}
+                addPoints(data);
+            });
+            
+		</script>
+	</body>
+</html>
+

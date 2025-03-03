@@ -1,0 +1,128 @@
+body {
+    margin:10px;
+}
+
+#homepage {
+    width: 100%;
+    max-width: 600px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 15px;
+    background: black; 
+    border-radius: 9px;
+}
+
+.labelfont {
+    font-family: Helvetica, Arial, sans-serif;
+    font-size: 28px;
+    font-weight: normal;
+    text-align: center;
+    text-shadow: none;
+}
+
+div#title h1 {
+    margin-top: 0px;
+    margin-bottom: 15px;
+    color:white;
+}
+
+div#content {
+    padding: 10px;
+    border-bottom: 1px solid #202020;
+    border-top-left-radius: 9px;
+    border-top-right-radius: 9px;
+    background-color: #33363c;
+}
+
+div#content label {
+    display: block;
+    padding: 0 0 5px 0;
+    color: #ccc;
+}
+
+input {
+    display: block;
+    margin-bottom: 15px;
+    padding: 10px 0;
+    background: #fff;
+    border: 1px solid #191919;
+    border-radius: 9px;
+    box-shadow: 0 0 15px #aaa inset;
+    color: #222;
+    letter-spacing: 1px;
+    width: 100%;
+    max-width: none;
+    min-width: none;
+    font-weight: bold;
+}
+
+button#submitbtn {
+  display: block;
+  width: 100%;
+  padding: 15px 15px;
+  margin-bottom: 0;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+  cursor: pointer;
+  color: #ffffff;
+  background-color: #428bca;
+  border-radius: 9px;
+}
+
+button#submitbtn:hover,
+button#submitbtn:focus,
+button#submitbtn:active,
+button#submitbtn.active {
+  background-color: #357ebd;  
+}
+
+p#messages {
+    background-color: #e6e6e6;
+    font: 18px "Helvetica Neue", "Lucida Grande", Arial, sans-serif;
+    color: #333332;
+    line-height: 1.4;
+    border-radius: unset;
+    box-shadow: none;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 18px;
+}
+
+/*
+    position: absolute;
+    width: 200px;
+    height: auto;
+    padding: 10px;
+    background-color: white;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+}
+
+#tooltip.hidden {
+    display: none;
+}
+
+#tooltip p {
+    margin: 0;
+    font-family: sans-serif;
+    font-size: 16px;
+    line-height: 20px;
+}
+*/
